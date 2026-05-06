@@ -15,19 +15,18 @@ variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.0.x'
   nodeVersion: '20.x'
+  # Referencia o Variable Group criado pelo setup-azure.sh
+  # Crie em: Pipelines → Library → + Variable Group → nome: vehicle-cd-secrets
+  - group: vehicle-cd-secrets
 
 # ═══════════════════════════════════════════════════════════════
 # STAGE 1 — BUILD & SECURITY SCAN
-# Os três jobs rodam em paralelo: backend, frontend e Semgrep.
 # ═══════════════════════════════════════════════════════════════
 stages:
   - stage: Build
     displayName: '🔨 Build & Security'
     jobs:
 
-      # ─────────────────────────────────────────────────────────
-      # JOB 1: Build do backend e publicação do binário
-      # ─────────────────────────────────────────────────────────
       - job: BuildBackend
         displayName: 'Build .NET API'
         steps:
@@ -63,9 +62,6 @@ stages:
               projects: 'Test/Test.csproj'
               arguments: '--configuration $(buildConfiguration) --no-restore'
 
-          # Publica os binários compilados para o stage de testes
-          # usar pipeline artifacts (não Build Artifacts) garante
-          # que o próximo stage pode baixar sem configuração extra.
           - task: DotNetCoreCLI@2
             displayName: 'Publish API (para artefato)'
             inputs:
@@ -78,14 +74,10 @@ stages:
             artifact: api-binaries
             displayName: 'Publicar binários da API'
 
-          # O binário de testes também é publicado para o stage Test
           - publish: Test/bin/$(buildConfiguration)/net8.0
             artifact: test-binaries
             displayName: 'Publicar binários de testes'
 
-      # ─────────────────────────────────────────────────────────
-      # JOB 2: Build do frontend Angular
-      # ─────────────────────────────────────────────────────────
       - job: BuildFrontend
         displayName: 'Build Angular Frontend'
         steps:
@@ -101,22 +93,16 @@ stages:
               path: frontend/node_modules
               restoreKeys: npm | "$(Agent.OS)"
 
-          - script: |
-              cd frontend && npm ci
+          - script: cd frontend && npm ci
             displayName: 'npm ci'
 
-          - script: |
-              cd frontend && npm run build
+          - script: cd frontend && npm run build
             displayName: 'ng build'
 
           - publish: frontend/dist
             artifact: frontend-dist
             displayName: 'Publicar dist do Angular'
 
-      # ─────────────────────────────────────────────────────────
-      # JOB 3: Análise de segurança com Semgrep
-      # Roda em paralelo — não depende do build.
-      # ─────────────────────────────────────────────────────────
       - job: SecurityScan
         displayName: 'Semgrep Security Scan'
         steps:
@@ -137,8 +123,6 @@ stages:
                       API/ Test/ || true
             displayName: 'Ruleset oficial p/csharp'
 
-          # Quality gate: bloqueia se encontrar HIGH ou CRITICAL
-          # Usa python inline para não depender de arquivo externo.
           - script: |
               python3 - <<'EOF'
               import json, sys
@@ -171,8 +155,6 @@ stages:
 
   # ═══════════════════════════════════════════════════════════════
   # STAGE 2 — TESTES UNITÁRIOS
-  # Baixa os binários já compilados — não recompila nada.
-  # Roda apenas TestCategory=Unit (sem dependência de banco de dados).
   # ═══════════════════════════════════════════════════════════════
   - stage: UnitTests
     displayName: '🧪 Unit Tests'
@@ -187,13 +169,10 @@ stages:
             inputs:
               version: $(dotnetVersion)
 
-          # Baixa os binários de teste publicados no stage anterior
           - download: current
             artifact: test-binaries
             displayName: 'Baixar binários de testes'
 
-          # Roda apenas os testes com [TestCategory("Unit")]
-          # Isso exclui AdminServiceTest (Integration) que precisa de banco
           - task: DotNetCoreCLI@2
             displayName: 'dotnet test — Category=Unit'
             inputs:
@@ -221,8 +200,6 @@ stages:
               codecoverageTool: Cobertura
             condition: always()
 
-          # Quality gate de cobertura usando a task nativa do Azure
-          # em vez de Python com glob frágil
           - task: BuildQualityChecks@9
             displayName: '🚨 Quality Gate — cobertura ≥ 60%'
             inputs:
@@ -230,15 +207,154 @@ stages:
               coverageFailOption: fixed
               coverageType: lines
               coverageThreshold: 60
-            # Nota: 60% é realista para o projeto atual.
-            # Aumente gradualmente conforme adicionar testes.
 
   # ═══════════════════════════════════════════════════════════════
-  # STAGE 3 — PUBLICAR ARTEFATOS (somente na branch main)
+  # STAGE 3 — BUILD & PUSH DA IMAGEM DOCKER
+  # Só roda na branch main, após os testes passarem
+  # ═══════════════════════════════════════════════════════════════
+  - stage: DockerBuild
+    displayName: '🐳 Docker Build & Push'
+    dependsOn: UnitTests
+    condition: >
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      )
+    jobs:
+      - job: BuildAndPushImage
+        displayName: 'Build e push da imagem para ACR'
+        steps:
+          - task: Docker@2
+            displayName: 'Login no Azure Container Registry'
+            inputs:
+              command: login
+              containerRegistry: 'azure-vehicle-acr'   # Service Connection do tipo Docker Registry
+                                                        # Crie em: Project Settings → Service Connections
+                                                        # → New → Docker Registry → Azure Container Registry
+
+          - task: Docker@2
+            displayName: 'Build da imagem'
+            inputs:
+              command: build
+              repository: 'vehicle-api'
+              dockerfile: 'Dockerfile'
+              # Tags: versão do build + latest para sempre ter a mais recente
+              tags: |
+                $(Build.BuildId)
+                latest
+
+          - task: Docker@2
+            displayName: 'Push para ACR'
+            inputs:
+              command: push
+              repository: 'vehicle-api'
+              tags: |
+                $(Build.BuildId)
+                latest
+
+  # ═══════════════════════════════════════════════════════════════
+  # STAGE 4 — DEPLOY (Continuous Delivery)
+  # Backend → Azure Container Apps
+  # Frontend → Azure Static Web Apps
+  # ═══════════════════════════════════════════════════════════════
+  - stage: Deploy
+    displayName: '🚀 Deploy'
+    dependsOn: DockerBuild
+    condition: >
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      )
+    jobs:
+
+      # ─── Backend: Azure Container Apps ───────────────────────
+      - job: DeployBackend
+        displayName: 'Deploy API → Container Apps'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Atualizar imagem no Container App'
+            inputs:
+              azureSubscription: 'azure-vehicle-connection'  # Service Connection ARM
+                                                             # Crie em: Project Settings → Service Connections
+                                                             # → New → Azure Resource Manager
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az containerapp update \
+                  --name "$(CONTAINER_APP_NAME)" \
+                  --resource-group "$(RESOURCE_GROUP)" \
+                  --image "$(ACR_LOGIN_SERVER)/vehicle-api:$(Build.BuildId)"
+
+          - task: AzureCLI@2
+            displayName: 'Atualizar variáveis de ambiente (connection string)'
+            inputs:
+              azureSubscription: 'azure-vehicle-connection'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                # A connection string do Neon vem da variável secreta NEON_CONNECTION_STRING
+                # configurada no Variable Group 'vehicle-cd-secrets'
+                az containerapp update \
+                  --name "$(CONTAINER_APP_NAME)" \
+                  --resource-group "$(RESOURCE_GROUP)" \
+                  --set-env-vars \
+                    "ConnectionStrings__Postgresql=$(NEON_CONNECTION_STRING)" \
+                    "Jwt__Key=$(JWT_KEY)" \
+                    "ASPNETCORE_ENVIRONMENT=Production"
+
+          - task: AzureCLI@2
+            displayName: '✅ Smoke test — aguarda Container App ficar healthy'
+            inputs:
+              azureSubscription: 'azure-vehicle-connection'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                echo "Aguardando Container App ficar disponível..."
+                FQDN=$(az containerapp show \
+                  --name "$(CONTAINER_APP_NAME)" \
+                  --resource-group "$(RESOURCE_GROUP)" \
+                  --query "properties.configuration.ingress.fqdn" -o tsv)
+
+                URL="https://$FQDN/"
+                MAX_RETRIES=12   # 12 × 10s = 2 minutos
+                COUNT=0
+
+                until curl -sf "$URL" > /dev/null; do
+                  COUNT=$((COUNT + 1))
+                  if [ $COUNT -ge $MAX_RETRIES ]; then
+                    echo "❌ Smoke test falhou após $MAX_RETRIES tentativas."
+                    exit 1
+                  fi
+                  echo "  Tentativa $COUNT/$MAX_RETRIES — aguardando 10s..."
+                  sleep 10
+                done
+
+                echo "✅ Backend respondendo em: $URL"
+
+      # ─── Frontend: Azure Static Web Apps ─────────────────────
+      - job: DeployFrontend
+        displayName: 'Deploy Angular → Static Web Apps'
+        steps:
+          - download: current
+            artifact: frontend-dist
+            displayName: 'Baixar dist do Angular'
+
+          - task: AzureStaticWebApp@0
+            displayName: 'Deploy para Azure Static Web Apps'
+            inputs:
+              # Token gerado pelo setup-azure.sh (SWA_DEPLOYMENT_TOKEN)
+              # Salvo como variável secreta no Variable Group
+              azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
+              app_location: '$(Pipeline.Workspace)/frontend-dist/frontend'
+              skip_app_build: true   # já foi buildado no stage Build
+              output_location: 'browser'
+
+  # ═══════════════════════════════════════════════════════════════
+  # STAGE 5 — PUBLISH ARTIFACTS (somente main, após deploy OK)
   # ═══════════════════════════════════════════════════════════════
   - stage: Publish
     displayName: '📦 Publish Artifacts'
-    dependsOn: UnitTests
+    dependsOn: Deploy
     condition: >
       and(
         succeeded(),
@@ -248,7 +364,6 @@ stages:
       - job: PublishArtifacts
         displayName: 'Promover artefatos para release'
         steps:
-          # Reutiliza o binário já publicado — não recompila
           - download: current
             artifact: api-binaries
             displayName: 'Baixar binários da API'
