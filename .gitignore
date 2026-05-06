@@ -52,9 +52,6 @@ _ReSharper*/
 ### Node / Angular
 node_modules/
 **/node_modules/
-# Angular build output
-frontend/dist/
-frontend/out-tsc/
 dist/
 .angular/
 
@@ -89,6 +86,52 @@ coverage-final.json
 ### Semgrep and local reports (kept in repo currently but ignored if local)
 semgrep-custom-report.json
 semgrep-full-report.json
+
+# ===============================
+# FRONTEND - Angular
+
+# Compiled output
+frontend/dist
+frontend/tmp
+frontend/out-tsc
+frontend/bazel-out
+
+# Node
+frontend/node_modules
+frontend/npm-debug.log
+frontend/yarn-error.log
+
+# IDEs and editors
+frontend/.idea/
+frontend/.project
+frontend/.classpath
+frontend/.c9/
+frontend/*.launch
+frontend/.settings/
+frontend/*.sublime-workspace
+
+# Visual Studio Code
+frontend/.vscode/*
+frontend/!.vscode/settings.json
+frontend/!.vscode/tasks.json
+frontend/!.vscode/launch.json
+frontend/!.vscode/extensions.json
+frontend/!.vscode/mcp.json
+frontend/.history/*
+
+# Miscellaneous
+frontend/.angular/cache
+frontend/.sass-cache/
+frontend/connect.lock
+frontend/coverage
+frontend/libpeerconnection.log
+frontend/testem.log
+frontend/typings
+frontend/__screenshots__/
+
+# System files
+frontend/.DS_Store
+frontend/Thumbs.db
 
 ### Misc
 # Ignore package lock *generated* debug logs but keep lockfiles under source control
