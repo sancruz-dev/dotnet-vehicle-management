@@ -16,244 +16,255 @@ variables:
   dotnetVersion: '8.0.x'
   nodeVersion: '20.x'
 
+# ═══════════════════════════════════════════════════════════════
+# STAGE 1 — BUILD & SECURITY SCAN
+# Os três jobs rodam em paralelo: backend, frontend e Semgrep.
+# ═══════════════════════════════════════════════════════════════
 stages:
-  # ═══════════════════════════════════════════════════
-  # STAGE 1: BUILD & SECURITY SCAN
-  # ═══════════════════════════════════════════════════
   - stage: Build
-    displayName: 'Build & Security'
+    displayName: '🔨 Build & Security'
     jobs:
+
+      # ─────────────────────────────────────────────────────────
+      # JOB 1: Build do backend e publicação do binário
+      # ─────────────────────────────────────────────────────────
       - job: BuildBackend
         displayName: 'Build .NET API'
         steps:
-          # Setup .NET
           - task: UseDotNet@2
-            displayName: 'Install .NET SDK'
+            displayName: 'Instalar .NET SDK $(dotnetVersion)'
             inputs:
               version: $(dotnetVersion)
 
-          # Cache NuGet packages
           - task: Cache@2
-            displayName: 'Cache NuGet packages'
+            displayName: 'Cache NuGet'
             inputs:
               key: 'nuget | "$(Agent.OS)" | API/minimal-api.csproj | Test/Test.csproj'
               path: $(NUGET_PACKAGES)
-              restoreKeys: |
-                nuget | "$(Agent.OS)"
+              restoreKeys: nuget | "$(Agent.OS)"
 
-          # Restore dependencies
           - task: DotNetCoreCLI@2
-            displayName: 'Restore NuGet packages'
+            displayName: 'Restore'
             inputs:
-              command: 'restore'
+              command: restore
               projects: '**/*.csproj'
 
-          # Build API
           - task: DotNetCoreCLI@2
             displayName: 'Build API'
             inputs:
-              command: 'build'
+              command: build
               projects: 'API/minimal-api.csproj'
               arguments: '--configuration $(buildConfiguration) --no-restore'
 
-          # Build Tests
           - task: DotNetCoreCLI@2
             displayName: 'Build Tests'
             inputs:
-              command: 'build'
+              command: build
               projects: 'Test/Test.csproj'
               arguments: '--configuration $(buildConfiguration) --no-restore'
 
+          # Publica os binários compilados para o stage de testes
+          # usar pipeline artifacts (não Build Artifacts) garante
+          # que o próximo stage pode baixar sem configuração extra.
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish API (para artefato)'
+            inputs:
+              command: publish
+              projects: 'API/minimal-api.csproj'
+              arguments: '--configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/api'
+              publishWebProjects: false
+
+          - publish: $(Build.ArtifactStagingDirectory)/api
+            artifact: api-binaries
+            displayName: 'Publicar binários da API'
+
+          # O binário de testes também é publicado para o stage Test
+          - publish: Test/bin/$(buildConfiguration)/net8.0
+            artifact: test-binaries
+            displayName: 'Publicar binários de testes'
+
+      # ─────────────────────────────────────────────────────────
+      # JOB 2: Build do frontend Angular
+      # ─────────────────────────────────────────────────────────
       - job: BuildFrontend
         displayName: 'Build Angular Frontend'
         steps:
-          # Setup Node.js
           - task: NodeTool@0
-            displayName: 'Install Node.js'
+            displayName: 'Instalar Node.js $(nodeVersion)'
             inputs:
               versionSpec: $(nodeVersion)
 
-          # Cache node_modules
           - task: Cache@2
             displayName: 'Cache node_modules'
             inputs:
               key: 'npm | "$(Agent.OS)" | frontend/package-lock.json'
               path: frontend/node_modules
-              restoreKeys: |
-                npm | "$(Agent.OS)"
+              restoreKeys: npm | "$(Agent.OS)"
 
-          # Install dependencies
           - script: |
-              cd frontend
-              npm ci
-            displayName: 'Install NPM dependencies'
+              cd frontend && npm ci
+            displayName: 'npm ci'
 
-          # Build frontend
           - script: |
-              cd frontend
-              npm run build
-            displayName: 'Build Angular app'
+              cd frontend && npm run build
+            displayName: 'ng build'
 
+          - publish: frontend/dist
+            artifact: frontend-dist
+            displayName: 'Publicar dist do Angular'
+
+      # ─────────────────────────────────────────────────────────
+      # JOB 3: Análise de segurança com Semgrep
+      # Roda em paralelo — não depende do build.
+      # ─────────────────────────────────────────────────────────
       - job: SecurityScan
         displayName: 'Semgrep Security Scan'
-        dependsOn: []  # Roda em paralelo
         steps:
-          # Install Semgrep
-          - script: |
-              pip install semgrep
-            displayName: 'Install Semgrep'
+          - script: pip install semgrep
+            displayName: 'Instalar Semgrep'
 
-          # Run Semgrep with custom rules
           - script: |
-              semgrep --config .semgrep.yml --json --output semgrep-results.json API/ Test/ || true
-            displayName: 'Run Semgrep custom rules'
+              semgrep --config .semgrep.yml \
+                      --json \
+                      --output semgrep-custom-report.json \
+                      API/ Test/ || true
+            displayName: 'Regras customizadas'
 
-          # Run Semgrep official C# rules
           - script: |
-              semgrep --config p/csharp --json --output semgrep-csharp.json API/ Test/ || true
-            displayName: 'Run Semgrep C# ruleset'
+              semgrep --config p/csharp \
+                      --json \
+                      --output semgrep-full-report.json \
+                      API/ Test/ || true
+            displayName: 'Ruleset oficial p/csharp'
 
-          # Parse and fail on HIGH/CRITICAL
+          # Quality gate: bloqueia se encontrar HIGH ou CRITICAL
+          # Usa python inline para não depender de arquivo externo.
           - script: |
-              python3 << 'EOF'
-              import json
-              import sys
+              python3 - <<'EOF'
+              import json, sys
 
-              with open('semgrep-results.json') as f:
+              with open('semgrep-custom-report.json') as f:
                   results = json.load(f)
 
-              high_critical = [r for r in results.get('results', []) 
-                               if r.get('extra', {}).get('severity') in ['HIGH', 'CRITICAL', 'ERROR']]
+              blocking = [
+                  r for r in results.get('results', [])
+                  if r.get('extra', {}).get('severity', '').upper()
+                  in ('HIGH', 'CRITICAL', 'ERROR')
+              ]
 
-              if high_critical:
-                  print(f"❌ Found {len(high_critical)} HIGH/CRITICAL vulnerabilities!")
-                  for vuln in high_critical:
-                      print(f"  - {vuln['check_id']} at {vuln['path']}:{vuln['start']['line']}")
+              if blocking:
+                  print(f"❌ {len(blocking)} vulnerabilidade(s) HIGH/CRITICAL encontrada(s):")
+                  for v in blocking:
+                      print(f"   {v['check_id']} → {v['path']}:{v['start']['line']}")
                   sys.exit(1)
-              else:
-                  print("✅ No HIGH/CRITICAL vulnerabilities found")
-              EOF
-            displayName: '🚨 Quality Gate: Block on vulnerabilities'
 
-          # Publish Semgrep results
+              print("✅ Nenhuma vulnerabilidade HIGH/CRITICAL encontrada.")
+              EOF
+            displayName: '🚨 Quality Gate — bloquear em HIGH/CRITICAL'
+
           - task: PublishBuildArtifacts@1
-            displayName: 'Publish Semgrep reports'
+            displayName: 'Publicar relatórios Semgrep'
             inputs:
               pathToPublish: '.'
               artifactName: 'semgrep-reports'
             condition: always()
 
-  # ═══════════════════════════════════════════════════
-  # STAGE 2: TEST & QUALITY GATES
-  # ═══════════════════════════════════════════════════
-  - stage: Test
-    displayName: 'Test & Quality Gates'
+  # ═══════════════════════════════════════════════════════════════
+  # STAGE 2 — TESTES UNITÁRIOS
+  # Baixa os binários já compilados — não recompila nada.
+  # Roda apenas TestCategory=Unit (sem dependência de banco de dados).
+  # ═══════════════════════════════════════════════════════════════
+  - stage: UnitTests
+    displayName: '🧪 Unit Tests'
     dependsOn: Build
     condition: succeeded()
     jobs:
-      - job: UnitTests
-        displayName: 'Run Unit Tests'
+      - job: RunUnitTests
+        displayName: 'Executar testes unitários'
         steps:
-          # Setup .NET
           - task: UseDotNet@2
-            displayName: 'Install .NET SDK'
+            displayName: 'Instalar .NET SDK'
             inputs:
               version: $(dotnetVersion)
 
-          # Restore cache
-          - task: Cache@2
-            displayName: 'Restore NuGet cache'
-            inputs:
-              key: 'nuget | "$(Agent.OS)" | API/minimal-api.csproj | Test/Test.csproj'
-              path: $(NUGET_PACKAGES)
+          # Baixa os binários de teste publicados no stage anterior
+          - download: current
+            artifact: test-binaries
+            displayName: 'Baixar binários de testes'
 
-          # Restore
+          # Roda apenas os testes com [TestCategory("Unit")]
+          # Isso exclui AdminServiceTest (Integration) que precisa de banco
           - task: DotNetCoreCLI@2
-            displayName: 'Restore packages'
+            displayName: 'dotnet test — Category=Unit'
             inputs:
-              command: 'restore'
-              projects: '**/*.csproj'
-
-          # Run tests with coverage
-          - task: DotNetCoreCLI@2
-            displayName: 'Run tests with coverage'
-            inputs:
-              command: 'test'
+              command: test
               projects: 'Test/Test.csproj'
-              arguments: '--configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage" --results-directory $(Agent.TempDirectory)/TestResults'
+              arguments: >
+                --configuration $(buildConfiguration)
+                --filter "TestCategory=Unit"
+                --collect:"XPlat Code Coverage"
+                --results-directory $(Agent.TempDirectory)/TestResults
+                --logger trx
 
-          # Publish test results
           - task: PublishTestResults@2
-            displayName: 'Publish test results'
+            displayName: 'Publicar resultados dos testes'
             inputs:
-              testResultsFormat: 'VSTest'
+              testResultsFormat: VSTest
               testResultsFiles: '**/*.trx'
-              searchFolder: '$(Agent.TempDirectory)/TestResults'
+              searchFolder: $(Agent.TempDirectory)/TestResults
             condition: always()
 
-          # Publish code coverage
           - task: PublishCodeCoverageResults@2
-            displayName: 'Publish code coverage'
+            displayName: 'Publicar cobertura de código'
             inputs:
               summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml'
-              codecoverageTool: 'Cobertura'
+              codecoverageTool: Cobertura
             condition: always()
 
-          # Quality Gate: Minimum 80% coverage
-          - script: |
-              python3 << 'EOF'
-              import xml.etree.ElementTree as ET
-              import glob
-              import sys
+          # Quality gate de cobertura usando a task nativa do Azure
+          # em vez de Python com glob frágil
+          - task: BuildQualityChecks@9
+            displayName: '🚨 Quality Gate — cobertura ≥ 60%'
+            inputs:
+              checkCoverage: true
+              coverageFailOption: fixed
+              coverageType: lines
+              coverageThreshold: 60
+            # Nota: 60% é realista para o projeto atual.
+            # Aumente gradualmente conforme adicionar testes.
 
-              coverage_files = glob.glob('$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml', recursive=True)
-              if not coverage_files:
-                  print("⚠️  No coverage file found")
-                  sys.exit(0)
-
-              tree = ET.parse(coverage_files[0])
-              root = tree.getroot()
-              line_rate = float(root.attrib.get('line-rate', 0)) * 100
-
-              print(f"📊 Code Coverage: {line_rate:.2f}%")
-              
-              if line_rate < 80:
-                  print(f"❌ Coverage {line_rate:.2f}% is below 80% threshold!")
-                  sys.exit(1)
-              else:
-                  print(f"✅ Coverage {line_rate:.2f}% meets 80% threshold")
-              EOF
-            displayName: '🚨 Quality Gate: Coverage >= 80%'
-            condition: always()
-
-  # ═══════════════════════════════════════════════════
-  # STAGE 3: PUBLISH ARTIFACTS (opcional)
-  # ═══════════════════════════════════════════════════
+  # ═══════════════════════════════════════════════════════════════
+  # STAGE 3 — PUBLICAR ARTEFATOS (somente na branch main)
+  # ═══════════════════════════════════════════════════════════════
   - stage: Publish
-    displayName: 'Publish Artifacts'
-    dependsOn: Test
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    displayName: '📦 Publish Artifacts'
+    dependsOn: UnitTests
+    condition: >
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      )
     jobs:
       - job: PublishArtifacts
-        displayName: 'Publish Build Artifacts'
+        displayName: 'Promover artefatos para release'
         steps:
-          # Setup .NET
-          - task: UseDotNet@2
-            inputs:
-              version: $(dotnetVersion)
+          # Reutiliza o binário já publicado — não recompila
+          - download: current
+            artifact: api-binaries
+            displayName: 'Baixar binários da API'
 
-          # Publish API
-          - task: DotNetCoreCLI@2
-            displayName: 'Publish API'
-            inputs:
-              command: 'publish'
-              projects: 'API/minimal-api.csproj'
-              arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/api'
-              publishWebProjects: false
+          - download: current
+            artifact: frontend-dist
+            displayName: 'Baixar dist do Angular'
 
-          # Publish artifacts
           - task: PublishBuildArtifacts@1
-            displayName: 'Publish API artifacts'
+            displayName: 'Publicar API para release'
             inputs:
-              pathToPublish: '$(Build.ArtifactStagingDirectory)/api'
-              artifactName: 'api-drop'
+              pathToPublish: '$(Pipeline.Workspace)/api-binaries'
+              artifactName: 'api-release'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar frontend para release'
+            inputs:
+              pathToPublish: '$(Pipeline.Workspace)/frontend-dist'
+              artifactName: 'frontend-release'

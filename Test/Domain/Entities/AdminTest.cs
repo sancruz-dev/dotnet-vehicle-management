@@ -1,13 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using minimal_api.Domain.Entities;
 
 namespace Test.Domain.Entities
 {
     [TestClass]
+    [TestCategory("Unit")]
     public class AdminTest
     {
         [TestMethod]
@@ -16,13 +13,13 @@ namespace Test.Domain.Entities
             // Arrange
             var adm = new Admin();
 
-            // Act (set)
+            // Act
             adm.Id = 1;
             adm.Email = "admin@teste.com";
             adm.Senha = "123456";
             adm.Perfil = "Adm";
 
-            // Assert (get)
+            // Assert
             Assert.AreEqual(1, adm.Id);
             Assert.AreEqual("admin@teste.com", adm.Email);
             Assert.AreEqual("123456", adm.Senha);
