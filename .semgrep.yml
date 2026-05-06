@@ -1,0 +1,11 @@
+rules:
+  - id: sql-injection-executesqlraw
+    pattern: $CTX.Database.ExecuteSqlRaw(...)
+    message: "ExecuteSqlRaw detectado. Use parametros para evitar SQL Injection."
+    languages: [csharp]
+    severity: WARNING
+  - id: console-writeline-sensitive
+    pattern: Console.WriteLine(...)
+    message: "Console.WriteLine em producao pode expor dados sensiveis."
+    languages: [csharp]
+    severity: INFO

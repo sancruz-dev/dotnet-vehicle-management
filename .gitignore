@@ -1,0 +1,95 @@
+## Improved .gitignore for this repository
+## Covers: Visual Studio / .NET, VS Code, Rider, Node/Angular, logs, secrets, and common temp files
+
+### Visual Studio / .NET
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Build outputs
+[Bb]in/
+[Oo]bj/
+out/
+publish/
+TestResults/
+
+## Rider and ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+## Visual Studio code workspace
+.vs/
+.vscode/
+
+## Runtime / compiled
+*.dll
+*.exe
+*.pdb
+*.cache
+
+### NuGet
+*.nupkg
+**/packages/*
+!**/packages/build/
+!**/packages/repositories.config
+
+### Dotnet user secrets and local appsettings
+## Ignore development/local secrets and environment files (not examples)
+**/appsettings.Development.json
+**/appsettings.Local.json
+*.usersecrets
+
+### Databases and local DB files
+*.mdf
+*.ldf
+*.sqlite
+*.db
+
+### Node / Angular
+node_modules/
+**/node_modules/
+# Angular build output
+frontend/dist/
+frontend/out-tsc/
+dist/
+.angular/
+
+### Env files
+.env
+.env.*.local
+.env.local
+
+### Logs, temp and editor files
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.tmp
+*.temp
+*.bak
+*.swp
+Thumbs.db
+.DS_Store
+
+### Test coverage and reports
+coverage/
+.nyc_output/
+coverage-final.json
+*.coverage
+*.coveragexml
+
+### CI and tooling
+.vspscc
+*.vssscc
+
+### Semgrep and local reports (kept in repo currently but ignored if local)
+semgrep-custom-report.json
+semgrep-full-report.json
+
+### Misc
+# Ignore package lock *generated* debug logs but keep lockfiles under source control
+# (do not ignore package-lock.json or yarn.lock intentionally)
