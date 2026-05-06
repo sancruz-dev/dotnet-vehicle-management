@@ -11,8 +11,8 @@ using minimal_api.infrastructure.DB;
 namespace minimal_api.Migrations
 {
     [DbContext(typeof(MinimalApiContext))]
-    [Migration("20260505222727_HashSenhaAdmin")]
-    partial class HashSenhaAdmin
+    [Migration("20260506172826_AtualizaSenhaAdmin")]
+    partial class AtualizaSenhaAdmin
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -44,8 +44,8 @@ namespace minimal_api.Migrations
 
                     b.Property<string>("Senha")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
                     b.HasKey("Id");
 

@@ -1,0 +1,7 @@
+<Solution>
+  <!-- Backend -->
+  <Project Path="API/minimal-api.csproj" />
+
+  <!-- Tests -->
+  <Project Path="Test/Test.csproj" />
+</Solution>
