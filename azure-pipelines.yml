@@ -26,7 +26,6 @@ variables:
 stages:
   - stage: Build
     displayName: '🔨 Build & Security'
-    condition: false
     jobs:
 
       - job: BuildBackend
@@ -143,18 +142,17 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: DockerBuild
     displayName: '🐳 Docker Build & Push'
-    dependsOn: []
-    condition: false
-    # condition: >
-    #   and(
-    #     succeeded(),
-    #     eq(variables['Build.SourceBranch'], 'refs/heads/main')
-    #   )
-    # condition: >
-    #   and(
-    #     succeeded(),
-    #     eq(variables['Build.SourceBranch'], 'refs/heads/main')
-    #   )
+    dependsOn: Build
+    condition: >
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      )
+    condition: >
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      )
     jobs:
       - job: BuildAndPushImage
         displayName: 'Build e push da imagem para ACR'
@@ -196,7 +194,7 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: Deploy
     displayName: '🚀 Deploy'
-    dependsOn: []
+    dependsOn: Build
     condition: >
       and(
         succeeded(),
@@ -276,9 +274,9 @@ stages:
         steps:
           - checkout: self
 
-          # - download: current
-          #   artifact: frontend-dist
-          #   displayName: 'Baixar dist do Angular'
+          - download: current
+            artifact: frontend-dist
+            displayName: 'Baixar dist do Angular'
 
           - task: AzureStaticWebApp@0
             displayName: 'Deploy para Azure Static Web Apps'
@@ -286,8 +284,7 @@ stages:
               # Token gerado pelo setup-azure.sh (SWA_DEPLOYMENT_TOKEN)
               # Salvo como variável secreta no Variable Group
               azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
-              app_location: frontend/dist/frontend'
-              # app_location: '$(Pipeline.Workspace)/frontend-dist/frontend'
+              app_location: '$(Pipeline.Workspace)/frontend-dist/frontend'
               skip_app_build: true   # já foi buildado no stage Build
               output_location: 'browser'
 
