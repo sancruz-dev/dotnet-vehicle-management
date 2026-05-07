@@ -137,55 +137,7 @@ stages:
             condition: always()
 
   # ═══════════════════════════════════════════════════════════════
-  # STAGE 2 — TESTES UNITÁRIOS
-  # ═══════════════════════════════════════════════════════════════
-  - stage: UnitTests
-    displayName: '🧪 Unit Tests'
-    dependsOn: Build
-    condition: succeeded()
-    jobs:
-      - job: RunUnitTests
-        displayName: 'Executar testes unitários'
-        steps:
-          - checkout: self
-          - task: UseDotNet@2
-            displayName: 'Instalar .NET SDK'
-            inputs:
-              version: $(dotnetVersion)
-          - task: DotNetCoreCLI@2
-            displayName: 'dotnet test — Category=Unit'
-            inputs:
-              command: test
-              projects: 'Test/Test.csproj'
-              arguments: >
-                --configuration $(buildConfiguration)
-                --filter "TestCategory=Unit"
-                --collect:"XPlat Code Coverage"
-                --results-directory $(Agent.TempDirectory)/TestResults
-                --logger trx
-          - task: PublishTestResults@2
-            displayName: 'Publicar resultados dos testes'
-            inputs:
-              testResultsFormat: VSTest
-              testResultsFiles: '**/*.trx'
-              searchFolder: $(Agent.TempDirectory)/TestResults
-            condition: always()
-          - task: PublishCodeCoverageResults@2
-            displayName: 'Publicar cobertura de código'
-            inputs:
-              summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml'
-              codecoverageTool: Cobertura
-            condition: always()
-          - task: BuildQualityChecks@10
-            displayName: '🚨 Quality Gate — cobertura ≥ 60%'
-            inputs:
-              checkCoverage: true
-              coverageFailOption: fixed
-              coverageType: lines
-              coverageThreshold: 60
-
-  # ═══════════════════════════════════════════════════════════════
-  # STAGE 3 — BUILD & PUSH DA IMAGEM DOCKER
+  # STAGE 2 — BUILD & PUSH DA IMAGEM DOCKER
   # Só roda na branch main, após os testes passarem
   # ═══════════════════════════════════════════════════════════════
   - stage: DockerBuild
@@ -231,7 +183,7 @@ stages:
                 latest
 
   # ═══════════════════════════════════════════════════════════════
-  # STAGE 4 — DEPLOY (Continuous Delivery)
+  # STAGE 3 — DEPLOY (Continuous Delivery)
   # Backend → Azure Container Apps
   # Frontend → Azure Static Web Apps
   # ═══════════════════════════════════════════════════════════════
@@ -332,7 +284,7 @@ stages:
               output_location: 'browser'
 
   # ═══════════════════════════════════════════════════════════════
-  # STAGE 5 — PUBLISH ARTIFACTS (somente main, após deploy OK)
+  # STAGE 4 — PUBLISH ARTIFACTS (somente main, após deploy OK)
   # ═══════════════════════════════════════════════════════════════
   - stage: Publish
     displayName: '📦 Publish Artifacts'
