@@ -148,11 +148,6 @@ stages:
         succeeded(),
         eq(variables['Build.SourceBranch'], 'refs/heads/main')
       )
-    condition: >
-      and(
-        succeeded(),
-        eq(variables['Build.SourceBranch'], 'refs/heads/main')
-      )
     jobs:
       - job: BuildAndPushImage
         displayName: 'Build e push da imagem para ACR'
@@ -194,7 +189,7 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: Deploy
     displayName: '🚀 Deploy'
-    dependsOn: Build
+    dependsOn: DockerBuild
     condition: >
       and(
         succeeded(),
