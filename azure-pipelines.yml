@@ -148,12 +148,10 @@ stages:
         displayName: 'Executar testes unitários'
         steps:
           - checkout: self
-
           - task: UseDotNet@2
             displayName: 'Instalar .NET SDK'
             inputs:
               version: $(dotnetVersion)
-
           - task: DotNetCoreCLI@2
             displayName: 'dotnet test — Category=Unit'
             inputs:
@@ -165,7 +163,6 @@ stages:
                 --collect:"XPlat Code Coverage"
                 --results-directory $(Agent.TempDirectory)/TestResults
                 --logger trx
-
           - task: PublishTestResults@2
             displayName: 'Publicar resultados dos testes'
             inputs:
@@ -173,14 +170,12 @@ stages:
               testResultsFiles: '**/*.trx'
               searchFolder: $(Agent.TempDirectory)/TestResults
             condition: always()
-
           - task: PublishCodeCoverageResults@2
             displayName: 'Publicar cobertura de código'
             inputs:
               summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml'
               codecoverageTool: Cobertura
             condition: always()
-
           - task: BuildQualityChecks@10
             displayName: '🚨 Quality Gate — cobertura ≥ 60%'
             inputs:
@@ -195,7 +190,7 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: DockerBuild
     displayName: '🐳 Docker Build & Push'
-    dependsOn: UnitTests
+    dependsOn: Build
     condition: >
       and(
         succeeded(),
@@ -242,7 +237,7 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: Deploy
     displayName: '🚀 Deploy'
-    dependsOn: DockerBuild
+    dependsOn: Build
     condition: >
       and(
         succeeded(),
@@ -352,7 +347,7 @@ stages:
         displayName: 'Promover artefatos para release'
         steps:
           - checkout: self
-          
+
           - download: current
             artifact: api-binaries
             displayName: 'Baixar binários da API'
