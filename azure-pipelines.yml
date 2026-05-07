@@ -31,6 +31,7 @@ stages:
       - job: BuildBackend
         displayName: 'Build .NET API'
         steps:
+          - checkout: self
           - task: UseDotNet@2
             displayName: 'Instalar .NET SDK $(dotnetVersion)'
             inputs:
@@ -82,6 +83,7 @@ stages:
       - job: BuildFrontend
         displayName: 'Build Angular Frontend'
         steps:
+          - checkout: self
           - task: NodeTool@0
             displayName: 'Instalar Node.js $(nodeVersion)'
             inputs:
@@ -107,6 +109,7 @@ stages:
       - job: SecurityScan
         displayName: 'Semgrep Security Scan'
         steps:
+          - checkout: self
           - script: pip install semgrep
             displayName: 'Instalar Semgrep'
 
