@@ -196,7 +196,7 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: Deploy
     displayName: '🚀 Deploy'
-    dependsOn: DockerBuild
+    dependsOn: []
     condition: >
       and(
         succeeded(),
