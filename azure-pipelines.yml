@@ -201,7 +201,7 @@ stages:
               codecoverageTool: Cobertura
             condition: always()
 
-          - task: BuildQualityChecks@9
+          - task: BuildQualityChecks@10
             displayName: '🚨 Quality Gate — cobertura ≥ 60%'
             inputs:
               checkCoverage: true
