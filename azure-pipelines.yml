@@ -41,7 +41,7 @@ stages:
             displayName: 'Cache NuGet'
             inputs:
               key: 'nuget | "$(Agent.OS)" | API/minimal-api.csproj | Test/Test.csproj'
-              path: $(NUGET_PACKAGES)
+              path: $(UserProfile)\.nuget\packages
               restoreKeys: nuget | "$(Agent.OS)"
 
           - task: DotNetCoreCLI@2
