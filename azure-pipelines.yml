@@ -207,28 +207,19 @@ stages:
             displayName: 'Atualizar imagem no Container App'
             inputs:
               azureSubscription: 'azure-vehicle-connection'
-              scriptType: pwsh
+              scriptType: pscore
               scriptLocation: inlineScript
               inlineScript: |
-                az containerapp update `
-                  --name "$(CONTAINER_APP_NAME)" `
-                  --resource-group "$(RESOURCE_GROUP)" `
-                  --image "$(ACR_LOGIN_SERVER)/vehicle-api:$(Build.BuildId)"
+                az containerapp update --name "$(CONTAINER_APP_NAME)" --resource-group "$(RESOURCE_GROUP)" --image "$(ACR_LOGIN_SERVER)/vehicle-api:$(Build.BuildId)"
 
           - task: AzureCLI@2
             displayName: 'Atualizar variáveis de ambiente'
             inputs:
               azureSubscription: 'azure-vehicle-connection'
-              scriptType: pwsh
+              scriptType: pscore
               scriptLocation: inlineScript
               inlineScript: |
-                az containerapp update `
-                  --name "$(CONTAINER_APP_NAME)" `
-                  --resource-group "$(RESOURCE_GROUP)" `
-                  --set-env-vars `
-                    "ConnectionStrings__Postgresql=$(NEON_CONNECTION_STRING)" `
-                    "Jwt__Key=$(JWT_KEY)" `
-                    "ASPNETCORE_ENVIRONMENT=Production"
+                az containerapp update --name "$(CONTAINER_APP_NAME)" --resource-group "$(RESOURCE_GROUP)" --set-env-vars "ConnectionStrings__Postgresql=$(NEON_CONNECTION_STRING)" "Jwt__Key=$(JWT_KEY)" "ASPNETCORE_ENVIRONMENT=Production"
 
           - task: AzureCLI@2
             displayName: '✅ Smoke test'
@@ -282,6 +273,15 @@ stages:
               app_location: '$(Pipeline.Workspace)/frontend-dist/frontend'
               skip_app_build: true   # já foi buildado no stage Build
               output_location: 'browser'
+
+          - task: AzureCLI@2
+            displayName: 'Deploy para Azure Static Web Apps'
+            inputs:
+              azureSubscription: 'azure-vehicle-connection'
+              scriptType: pscore
+              scriptLocation: inlineScript
+              inlineScript: |
+                az staticwebapp deploy --name "$(SWA_NAME)" --resource-group "$(RESOURCE_GROUP)" --app-location "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)"
 
   # ═══════════════════════════════════════════════════════════════
   # STAGE 4 — PUBLISH ARTIFACTS (somente main, após deploy OK)
