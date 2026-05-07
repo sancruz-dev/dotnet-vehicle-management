@@ -8,7 +8,7 @@ trigger:
       - README.md
       - docs/**
 
-pool:
+pool: 
   name: Default
 
 variables:
