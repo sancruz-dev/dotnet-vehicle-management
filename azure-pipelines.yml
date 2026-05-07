@@ -245,7 +245,7 @@ stages:
             displayName: 'Deploy para Azure Static Web Apps'
             inputs:
               azureSubscription: 'azure-vehicle-connection'
-              scriptType: pscore
+              scriptType: batch
               scriptLocation: inlineScript
               inlineScript: |
                 az staticwebapp deploy --name "$(SWA_NAME)" --resource-group "$(RESOURCE_GROUP)" --app-location "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)"
