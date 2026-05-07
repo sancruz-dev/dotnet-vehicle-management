@@ -147,6 +147,8 @@ stages:
       - job: RunUnitTests
         displayName: 'Executar testes unitários'
         steps:
+          - checkout: self
+
           - task: UseDotNet@2
             displayName: 'Instalar .NET SDK'
             inputs:
@@ -203,6 +205,8 @@ stages:
       - job: BuildAndPushImage
         displayName: 'Build e push da imagem para ACR'
         steps:
+          - checkout: self
+
           - task: Docker@2
             displayName: 'Login no Azure Container Registry'
             inputs:
@@ -250,6 +254,8 @@ stages:
       - job: DeployBackend
         displayName: 'Deploy API → Container Apps'
         steps:
+          - checkout: self
+          
           - task: AzureCLI@2
             displayName: 'Atualizar imagem no Container App'
             inputs:
@@ -314,6 +320,8 @@ stages:
       - job: DeployFrontend
         displayName: 'Deploy Angular → Static Web Apps'
         steps:
+          - checkout: self
+
           - download: current
             artifact: frontend-dist
             displayName: 'Baixar dist do Angular'
@@ -343,6 +351,8 @@ stages:
       - job: PublishArtifacts
         displayName: 'Promover artefatos para release'
         steps:
+          - checkout: self
+          
           - download: current
             artifact: api-binaries
             displayName: 'Baixar binários da API'
