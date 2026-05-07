@@ -144,11 +144,12 @@ stages:
   - stage: DockerBuild
     displayName: '🐳 Docker Build & Push'
     dependsOn: []
-    condition: >
-      and(
-        succeeded(),
-        eq(variables['Build.SourceBranch'], 'refs/heads/main')
-      )
+    condition: false
+    # condition: >
+    #   and(
+    #     succeeded(),
+    #     eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    #   )
     # condition: >
     #   and(
     #     succeeded(),
@@ -195,7 +196,7 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: Deploy
     displayName: '🚀 Deploy'
-    dependsOn: []
+    dependsOn: DockerBuild
     condition: >
       and(
         succeeded(),
@@ -212,62 +213,62 @@ stages:
           - task: AzureCLI@2
             displayName: 'Atualizar imagem no Container App'
             inputs:
-              azureSubscription: 'azure-vehicle-connection'  # Service Connection ARM
-                                                             # Crie em: Project Settings → Service Connections
-                                                             # → New → Azure Resource Manager
-              scriptType: bash
+              azureSubscription: 'azure-vehicle-connection'
+              scriptType: pwsh
               scriptLocation: inlineScript
               inlineScript: |
-                az containerapp update \
-                  --name "$(CONTAINER_APP_NAME)" \
-                  --resource-group "$(RESOURCE_GROUP)" \
+                az containerapp update `
+                  --name "$(CONTAINER_APP_NAME)" `
+                  --resource-group "$(RESOURCE_GROUP)" `
                   --image "$(ACR_LOGIN_SERVER)/vehicle-api:$(Build.BuildId)"
 
           - task: AzureCLI@2
-            displayName: 'Atualizar variáveis de ambiente (connection string)'
+            displayName: 'Atualizar variáveis de ambiente'
             inputs:
               azureSubscription: 'azure-vehicle-connection'
-              scriptType: bash
+              scriptType: pwsh
               scriptLocation: inlineScript
               inlineScript: |
-                # A connection string do Neon vem da variável secreta NEON_CONNECTION_STRING
-                # configurada no Variable Group 'vehicle-cd-secrets'
-                az containerapp update \
-                  --name "$(CONTAINER_APP_NAME)" \
-                  --resource-group "$(RESOURCE_GROUP)" \
-                  --set-env-vars \
-                    "ConnectionStrings__Postgresql=$(NEON_CONNECTION_STRING)" \
-                    "Jwt__Key=$(JWT_KEY)" \
+                az containerapp update `
+                  --name "$(CONTAINER_APP_NAME)" `
+                  --resource-group "$(RESOURCE_GROUP)" `
+                  --set-env-vars `
+                    "ConnectionStrings__Postgresql=$(NEON_CONNECTION_STRING)" `
+                    "Jwt__Key=$(JWT_KEY)" `
                     "ASPNETCORE_ENVIRONMENT=Production"
 
           - task: AzureCLI@2
-            displayName: '✅ Smoke test — aguarda Container App ficar healthy'
+            displayName: '✅ Smoke test'
             inputs:
               azureSubscription: 'azure-vehicle-connection'
-              scriptType: bash
+              scriptType: pwsh
               scriptLocation: inlineScript
               inlineScript: |
-                echo "Aguardando Container App ficar disponível..."
-                FQDN=$(az containerapp show \
-                  --name "$(CONTAINER_APP_NAME)" \
-                  --resource-group "$(RESOURCE_GROUP)" \
-                  --query "properties.configuration.ingress.fqdn" -o tsv)
+                $FQDN = az containerapp show `
+                  --name "$(CONTAINER_APP_NAME)" `
+                  --resource-group "$(RESOURCE_GROUP)" `
+                  --query "properties.configuration.ingress.fqdn" -o tsv
 
-                URL="https://$FQDN/"
-                MAX_RETRIES=12   # 12 × 10s = 2 minutos
-                COUNT=0
+                $URL = "https://$FQDN/"
+                $MAX_RETRIES = 12
+                $COUNT = 0
 
-                until curl -sf "$URL" > /dev/null; do
-                  COUNT=$((COUNT + 1))
-                  if [ $COUNT -ge $MAX_RETRIES ]; then
-                    echo "❌ Smoke test falhou após $MAX_RETRIES tentativas."
-                    exit 1
-                  fi
-                  echo "  Tentativa $COUNT/$MAX_RETRIES — aguardando 10s..."
-                  sleep 10
-                done
-
-                echo "✅ Backend respondendo em: $URL"
+                while ($COUNT -lt $MAX_RETRIES) {
+                  try {
+                    $response = Invoke-WebRequest -Uri $URL -UseBasicParsing -TimeoutSec 5
+                    if ($response.StatusCode -eq 200) {
+                      Write-Host "✅ Backend respondendo em: $URL"
+                      exit 0
+                    }
+                  } catch { }
+                  
+                  $COUNT++
+                  Write-Host "Tentativa $COUNT/$MAX_RETRIES — aguardando 10s..."
+                  Start-Sleep -Seconds 10
+                }
+                
+                Write-Host "❌ Smoke test falhou após $MAX_RETRIES tentativas."
+                exit 1
 
       # ─── Frontend: Azure Static Web Apps ─────────────────────
       - job: DeployFrontend
@@ -275,9 +276,9 @@ stages:
         steps:
           - checkout: self
 
-          - download: current
-            artifact: frontend-dist
-            displayName: 'Baixar dist do Angular'
+          # - download: current
+          #   artifact: frontend-dist
+          #   displayName: 'Baixar dist do Angular'
 
           - task: AzureStaticWebApp@0
             displayName: 'Deploy para Azure Static Web Apps'
@@ -285,7 +286,8 @@ stages:
               # Token gerado pelo setup-azure.sh (SWA_DEPLOYMENT_TOKEN)
               # Salvo como variável secreta no Variable Group
               azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
-              app_location: '$(Pipeline.Workspace)/frontend-dist/frontend'
+              app_location: frontend/dist/frontend'
+              # app_location: '$(Pipeline.Workspace)/frontend-dist/frontend'
               skip_app_build: true   # já foi buildado no stage Build
               output_location: 'browser'
 
