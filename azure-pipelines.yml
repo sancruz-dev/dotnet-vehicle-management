@@ -110,44 +110,37 @@ stages:
         displayName: 'Semgrep Security Scan'
         steps:
           - checkout: self
+
           - script: pip install semgrep
             displayName: 'Instalar Semgrep'
 
-          - script: |
-              semgrep --config .semgrep.yml \
-                      --json \
-                      --output semgrep-custom-report.json \
-                      API/ Test/ || true
+          - powershell: |
+              semgrep --config .semgrep.yml `
+                      --json `
+                      --output semgrep-custom-report.json `
+                      API/ Test/
             displayName: 'Regras customizadas'
+            continueOnError: true
 
-          - script: |
-              semgrep --config p/csharp \
-                      --json \
-                      --output semgrep-full-report.json \
-                      API/ Test/ || true
+          - powershell: |
+              semgrep --config p/csharp `
+                      --json `
+                      --output semgrep-full-report.json `
+                      API/ Test/
             displayName: 'Ruleset oficial p/csharp'
+            continueOnError: true
 
-          - script: |
-              python3 - <<'EOF'
-              import json, sys
-
-              with open('semgrep-custom-report.json') as f:
-                  results = json.load(f)
-
-              blocking = [
-                  r for r in results.get('results', [])
-                  if r.get('extra', {}).get('severity', '').upper()
-                  in ('HIGH', 'CRITICAL', 'ERROR')
-              ]
-
-              if blocking:
-                  print(f"❌ {len(blocking)} vulnerabilidade(s) HIGH/CRITICAL encontrada(s):")
-                  for v in blocking:
-                      print(f"   {v['check_id']} → {v['path']}:{v['start']['line']}")
-                  sys.exit(1)
-
-              print("✅ Nenhuma vulnerabilidade HIGH/CRITICAL encontrada.")
-              EOF
+          - powershell: |
+              $results = Get-Content semgrep-custom-report.json | ConvertFrom-Json
+              $blocking = $results.results | Where-Object {
+                $_.extra.severity -in @('HIGH', 'CRITICAL', 'ERROR')
+              }
+              if ($blocking) {
+                Write-Host "❌ $($blocking.Count) vulnerabilidade(s) HIGH/CRITICAL encontrada(s):"
+                $blocking | ForEach-Object { Write-Host "  $($_.check_id) -> $($_.path):$($_.start.line)" }
+                exit 1
+              }
+              Write-Host "✅ Nenhuma vulnerabilidade HIGH/CRITICAL encontrada."
             displayName: '🚨 Quality Gate — bloquear em HIGH/CRITICAL'
 
           - task: PublishBuildArtifacts@1
