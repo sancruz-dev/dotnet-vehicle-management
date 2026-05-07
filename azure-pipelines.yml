@@ -37,13 +37,6 @@ stages:
             inputs:
               version: $(dotnetVersion)
 
-          - task: Cache@2
-            displayName: 'Cache NuGet'
-            inputs:
-              key: 'nuget | "$(Agent.OS)" | API/minimal-api.csproj | Test/Test.csproj'
-              path: $(UserProfile)\.nuget\packages
-              restoreKeys: nuget | "$(Agent.OS)"
-
           - task: DotNetCoreCLI@2
             displayName: 'Restore'
             inputs:
@@ -88,13 +81,6 @@ stages:
             displayName: 'Instalar Node.js $(nodeVersion)'
             inputs:
               versionSpec: $(nodeVersion)
-
-          - task: Cache@2
-            displayName: 'Cache node_modules'
-            inputs:
-              key: 'npm | "$(Agent.OS)" | frontend/package-lock.json'
-              path: frontend/node_modules
-              restoreKeys: npm | "$(Agent.OS)"
 
           - script: cd frontend && npm ci
             displayName: 'npm ci'
