@@ -86,6 +86,9 @@ coverage-final.json
 ### Semgrep and local reports (kept in repo currently but ignored if local)
 semgrep-custom-report.json
 semgrep-full-report.json
+
+### setup azure
+setup-azure.sh
  
 # ===============================
 # FRONTEND - Angular

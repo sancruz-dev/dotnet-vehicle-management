@@ -12,12 +12,13 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  buildConfiguration: 'Release'
-  dotnetVersion: '8.0.x'
-  nodeVersion: '20.x'
-  # Referencia o Variable Group criado pelo setup-azure.sh
-  # Crie em: Pipelines → Library → + Variable Group → nome: vehicle-cd-secrets
-  - group: vehicle-cd-secrets
+  - group: vehicle-cd-secrets   # Pipelines → Library → + Variable Group
+  - name: buildConfiguration
+    value: 'Release'
+  - name: dotnetVersion
+    value: '8.0.x'
+  - name: nodeVersion
+    value: '20.x'
 
 # ═══════════════════════════════════════════════════════════════
 # STAGE 1 — BUILD & SECURITY SCAN
