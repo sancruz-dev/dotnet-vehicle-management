@@ -152,16 +152,6 @@ stages:
             inputs:
               version: $(dotnetVersion)
 
-          - download: current
-            artifact: test-binaries
-            displayName: 'Baixar binários de testes'
-
-          - task: DotNetCoreCLI@2
-            displayName: 'Restore Test Project'
-            inputs:
-              command: restore
-              projects: 'Test/Test.csproj'
-
           - task: DotNetCoreCLI@2
             displayName: 'dotnet test — Category=Unit'
             inputs:
