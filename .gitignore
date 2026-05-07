@@ -42,6 +42,8 @@ _ReSharper*/
 **/appsettings.Development.json
 **/appsettings.Local.json
 *.usersecrets
+!Test/appsettings.Development.json
+
 
 ### Databases and local DB files
 *.mdf
