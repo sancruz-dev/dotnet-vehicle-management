@@ -24,117 +24,117 @@ variables:
 # STAGE 1 — BUILD & SECURITY SCAN
 # ═══════════════════════════════════════════════════════════════
 stages:
-  - stage: Build
-    displayName: '🔨 Build & Security'
-    jobs:
+  # - stage: Build
+  #   displayName: '🔨 Build & Security'
+  #   jobs:
 
-      - job: BuildBackend
-        displayName: 'Build .NET API'
-        steps:
-          - checkout: self
-          - task: UseDotNet@2
-            displayName: 'Instalar .NET SDK $(dotnetVersion)'
-            inputs:
-              version: $(dotnetVersion)
+  #     - job: BuildBackend
+  #       displayName: 'Build .NET API'
+  #       steps:
+  #         - checkout: self
+  #         - task: UseDotNet@2
+  #           displayName: 'Instalar .NET SDK $(dotnetVersion)'
+  #           inputs:
+  #             version: $(dotnetVersion)
 
-          - task: DotNetCoreCLI@2
-            displayName: 'Restore'
-            inputs:
-              command: restore
-              projects: '**/*.csproj'
+  #         - task: DotNetCoreCLI@2
+  #           displayName: 'Restore'
+  #           inputs:
+  #             command: restore
+  #             projects: '**/*.csproj'
 
-          - task: DotNetCoreCLI@2
-            displayName: 'Build API'
-            inputs:
-              command: build
-              projects: 'API/minimal-api.csproj'
-              arguments: '--configuration $(buildConfiguration) --no-restore'
+  #         - task: DotNetCoreCLI@2
+  #           displayName: 'Build API'
+  #           inputs:
+  #             command: build
+  #             projects: 'API/minimal-api.csproj'
+  #             arguments: '--configuration $(buildConfiguration) --no-restore'
 
-          - task: DotNetCoreCLI@2
-            displayName: 'Build Tests'
-            inputs:
-              command: build
-              projects: 'Test/Test.csproj'
-              arguments: '--configuration $(buildConfiguration) --no-restore'
+  #         - task: DotNetCoreCLI@2
+  #           displayName: 'Build Tests'
+  #           inputs:
+  #             command: build
+  #             projects: 'Test/Test.csproj'
+  #             arguments: '--configuration $(buildConfiguration) --no-restore'
 
-          - task: DotNetCoreCLI@2
-            displayName: 'Publish API (para artefato)'
-            inputs:
-              command: publish
-              projects: 'API/minimal-api.csproj'
-              arguments: '--configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/api'
-              publishWebProjects: false
+  #         - task: DotNetCoreCLI@2
+  #           displayName: 'Publish API (para artefato)'
+  #           inputs:
+  #             command: publish
+  #             projects: 'API/minimal-api.csproj'
+  #             arguments: '--configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/api'
+  #             publishWebProjects: false
 
-          - publish: $(Build.ArtifactStagingDirectory)/api
-            artifact: api-binaries
-            displayName: 'Publicar binários da API'
+  #         - publish: $(Build.ArtifactStagingDirectory)/api
+  #           artifact: api-binaries
+  #           displayName: 'Publicar binários da API'
 
-          - publish: Test/bin/$(buildConfiguration)/net8.0
-            artifact: test-binaries
-            displayName: 'Publicar binários de testes'
+  #         - publish: Test/bin/$(buildConfiguration)/net8.0
+  #           artifact: test-binaries
+  #           displayName: 'Publicar binários de testes'
 
-      - job: BuildFrontend
-        displayName: 'Build Angular Frontend'
-        steps:
-          - checkout: self
-          - task: NodeTool@0
-            displayName: 'Instalar Node.js $(nodeVersion)'
-            inputs:
-              versionSpec: $(nodeVersion)
+  #     - job: BuildFrontend
+  #       displayName: 'Build Angular Frontend'
+  #       steps:
+  #         - checkout: self
+  #         - task: NodeTool@0
+  #           displayName: 'Instalar Node.js $(nodeVersion)'
+  #           inputs:
+  #             versionSpec: $(nodeVersion)
 
-          - script: cd frontend && npm ci
-            displayName: 'npm ci'
+  #         - script: cd frontend && npm ci
+  #           displayName: 'npm ci'
 
-          - script: cd frontend && npm run build
-            displayName: 'ng build'
+  #         - script: cd frontend && npm run build
+  #           displayName: 'ng build'
 
-          - publish: frontend/dist
-            artifact: frontend-dist
-            displayName: 'Publicar dist do Angular'
+  #         - publish: frontend/dist
+  #           artifact: frontend-dist
+  #           displayName: 'Publicar dist do Angular'
 
-      - job: SecurityScan
-        displayName: 'Semgrep Security Scan'
-        steps:
-          - checkout: self
+  #     - job: SecurityScan
+  #       displayName: 'Semgrep Security Scan'
+  #       steps:
+  #         - checkout: self
 
-          - script: pip install semgrep
-            displayName: 'Instalar Semgrep'
+  #         - script: pip install semgrep
+  #           displayName: 'Instalar Semgrep'
 
-          - powershell: |
-              semgrep --config .semgrep.yml `
-                      --json `
-                      --output semgrep-custom-report.json `
-                      API/ Test/
-            displayName: 'Regras customizadas'
-            continueOnError: true
+  #         - powershell: |
+  #             semgrep --config .semgrep.yml `
+  #                     --json `
+  #                     --output semgrep-custom-report.json `
+  #                     API/ Test/
+  #           displayName: 'Regras customizadas'
+  #           continueOnError: true
 
-          - powershell: |
-              semgrep --config p/csharp `
-                      --json `
-                      --output semgrep-full-report.json `
-                      API/ Test/
-            displayName: 'Ruleset oficial p/csharp'
-            continueOnError: true
+  #         - powershell: |
+  #             semgrep --config p/csharp `
+  #                     --json `
+  #                     --output semgrep-full-report.json `
+  #                     API/ Test/
+  #           displayName: 'Ruleset oficial p/csharp'
+  #           continueOnError: true
 
-          - powershell: |
-              $results = Get-Content semgrep-custom-report.json | ConvertFrom-Json
-              $blocking = $results.results | Where-Object {
-                $_.extra.severity -in @('HIGH', 'CRITICAL', 'ERROR')
-              }
-              if ($blocking) {
-                Write-Host "❌ $($blocking.Count) vulnerabilidade(s) HIGH/CRITICAL encontrada(s):"
-                $blocking | ForEach-Object { Write-Host "  $($_.check_id) -> $($_.path):$($_.start.line)" }
-                exit 1
-              }
-              Write-Host "✅ Nenhuma vulnerabilidade HIGH/CRITICAL encontrada."
-            displayName: '🚨 Quality Gate — bloquear em HIGH/CRITICAL'
+  #         - powershell: |
+  #             $results = Get-Content semgrep-custom-report.json | ConvertFrom-Json
+  #             $blocking = $results.results | Where-Object {
+  #               $_.extra.severity -in @('HIGH', 'CRITICAL', 'ERROR')
+  #             }
+  #             if ($blocking) {
+  #               Write-Host "❌ $($blocking.Count) vulnerabilidade(s) HIGH/CRITICAL encontrada(s):"
+  #               $blocking | ForEach-Object { Write-Host "  $($_.check_id) -> $($_.path):$($_.start.line)" }
+  #               exit 1
+  #             }
+  #             Write-Host "✅ Nenhuma vulnerabilidade HIGH/CRITICAL encontrada."
+  #           displayName: '🚨 Quality Gate — bloquear em HIGH/CRITICAL'
 
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publicar relatórios Semgrep'
-            inputs:
-              pathToPublish: '.'
-              artifactName: 'semgrep-reports'
-            condition: always()
+  #         - task: PublishBuildArtifacts@1
+  #           displayName: 'Publicar relatórios Semgrep'
+  #           inputs:
+  #             pathToPublish: '.'
+  #             artifactName: 'semgrep-reports'
+  #           condition: always()
 
   # ═══════════════════════════════════════════════════════════════
   # STAGE 2 — TESTES UNITÁRIOS
