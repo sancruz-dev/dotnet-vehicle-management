@@ -26,6 +26,7 @@ variables:
 stages:
   - stage: Build
     displayName: '🔨 Build & Security'
+    condition: false
     jobs:
 
       - job: BuildBackend
@@ -142,12 +143,17 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: DockerBuild
     displayName: '🐳 Docker Build & Push'
-    dependsOn: Build
+    dependsOn: []
     condition: >
       and(
         succeeded(),
         eq(variables['Build.SourceBranch'], 'refs/heads/main')
       )
+    # condition: >
+    #   and(
+    #     succeeded(),
+    #     eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    #   )
     jobs:
       - job: BuildAndPushImage
         displayName: 'Build e push da imagem para ACR'
@@ -189,7 +195,7 @@ stages:
   # ═══════════════════════════════════════════════════════════════
   - stage: Deploy
     displayName: '🚀 Deploy'
-    dependsOn: Build
+    dependsOn: []
     condition: >
       and(
         succeeded(),
