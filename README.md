@@ -201,6 +201,9 @@ pip install semgrep
 
 Dois relatórios JSON são gerados: `semgrep-custom-report.json` (regras do projeto) e `semgrep-full-report.json` (ruleset oficial `p/csharp`).
 
+Para validar a análise manualmente sem precisar rodar o pipeline completo, use `check_vulnerability.py`. Ele é um utilitário local que replica a lógica do quality gate do pipeline: lê o semgrep-custom-report.json e retorna erro se encontrar findings HIGH ou CRITICAL.
+
+
 ---
 
 ## Testes
