@@ -241,14 +241,16 @@ stages:
             artifact: frontend-dist
             displayName: 'Baixar dist do Angular'
 
-          - task: AzureStaticWebApp@0
-            displayName: 'Deploy Angular → Static Web Apps'
+          - task: AzureCLI@2
+            displayName: 'Deploy para Azure Static Web Apps'
             inputs:
-              app_location: '$(Pipeline.Workspace)/frontend-dist/frontend/browser'
-              output_location: ''
-              azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
-              skip_app_build: true
-
+              azureSubscription: 'azure-vehicle-connection'
+              scriptType: batch
+              scriptLocation: inlineScript
+              inlineScript: |
+                az extension add --name staticwebapp --yes
+                az staticwebapp deploy --name "$(SWA_NAME)" --resource-group "$(RESOURCE_GROUP)" --source "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" --no-build
+                
   # ═══════════════════════════════════════════════════════════════
   # STAGE 4 — PUBLISH ARTIFACTS (somente main, após deploy OK)
   # ═══════════════════════════════════════════════════════════════
