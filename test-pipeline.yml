@@ -17,10 +17,10 @@ steps:
   - script: npm install -g @azure/static-web-apps-cli
     displayName: 'Instalar SWA CLI'
 
-- task: AzureCLI@2
-    displayName: 'Deploy para Azure Static Web Apps'
-    inputs:
-      azureSubscription: 'azure-vehicle-connection'
-      scriptType: batch
-      scriptLocation: inlineScript
-      inlineScript: swa deploy "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" --env production --api-location ""
+  - task: AzureCLI@2
+      displayName: 'Deploy para Azure Static Web Apps'
+      inputs:
+        azureSubscription: 'azure-vehicle-connection'
+        scriptType: batch
+        scriptLocation: inlineScript
+        inlineScript: swa deploy "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" --env production --api-location ""
