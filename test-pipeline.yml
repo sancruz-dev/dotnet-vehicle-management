@@ -14,13 +14,13 @@ steps:
       artifactName: 'frontend-dist'
       targetPath: '$(Pipeline.Workspace)/frontend-dist'
 
-    - script: npm install -g @azure/static-web-apps-cli@1.0.0
-      displayName: 'Instalar SWA CLI v1'
+  - script: npm install -g @azure/static-web-apps-cli@1.0.0
+    displayName: 'Instalar SWA CLI v1'
 
-    - task: AzureCLI@2
-      displayName: 'Deploy para Azure Static Web Apps'
-      inputs:
-        azureSubscription: 'azure-vehicle-connection'
-        scriptType: batch
-        scriptLocation: inlineScript
-        inlineScript: swa deploy "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" --env production --api-location ""
+  - task: AzureCLI@2
+    displayName: 'Deploy para Azure Static Web Apps'
+    inputs:
+      azureSubscription: 'azure-vehicle-connection'
+      scriptType: batch
+      scriptLocation: inlineScript
+      inlineScript: swa deploy "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" --env production --api-location ""
