@@ -23,4 +23,4 @@ steps:
       azureSubscription: 'azure-vehicle-connection'
       scriptType: batch
       scriptLocation: inlineScript
-      inlineScript: swa deploy "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" --env production --api-location ""
+      inlineScript: swa deploy "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "e46f07cb82a1fb613aa1feac223dbfb60c05eeeacf1adcc5a035a9f921db80f307-844340c1-a033-450b-b333-1a470089398c00f2202074d07d0f" --env production --api-location ""
