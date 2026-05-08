@@ -4,10 +4,22 @@ pool:
   name: Default
 
 steps:
+  - download: none
+
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: specific
+      project: 'Vehicle Management'
+      pipeline: 'dotnet-vehicle-management'
+      artifactName: 'frontend-dist'
+      targetPath: '$(Pipeline.Workspace)/frontend-dist'
+
   - task: AzureCLI@2
-    displayName: 'List SWA commands'
+    displayName: 'Deploy para Azure Static Web Apps'
     inputs:
       azureSubscription: 'azure-vehicle-connection'
       scriptType: batch
       scriptLocation: inlineScript
-      inlineScript: az staticwebapp --help
+      inlineScript: |
+        npm install -g @azure/static-web-apps-cli
+        swa deploy "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" --env production
