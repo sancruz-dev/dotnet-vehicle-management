@@ -24,7 +24,10 @@ public class Startup
         services.AddCors(options =>
         {
             options.AddPolicy("AllowAngular", policy =>
-                policy.WithOrigins("http://localhost:4200")
+                policy.WithOrigins(
+                        "http://localhost:4200",
+                        "https://kind-beach-074d07d0f.7.azurestaticapps.net"
+                    )
                     .AllowAnyHeader()
                     .AllowAnyMethod());
         });
