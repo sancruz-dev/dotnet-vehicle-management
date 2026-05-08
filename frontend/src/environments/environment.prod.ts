@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://kind-beach-074d07d0f.7.azurestaticapps.net'
+  apiUrl: 'https://vehicle-api.icygrass-363a802f.eastus.azurecontainerapps.io'
 };
