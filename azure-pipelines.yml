@@ -218,14 +218,11 @@ stages:
               azureSubscription: 'azure-vehicle-connection'
               scriptType: batch
               scriptLocation: inlineScript
-              inlineScript: |
-                az containerapp update \
-                  --name "$(CONTAINER_APP_NAME)" \
-                  --resource-group "$(RESOURCE_GROUP)" \
-                  --set-env-vars \
-                    'ConnectionStrings__Postgresql=$(NEON_CONNECTION_STRING)' \
-                    'Jwt__Key=$(JWT_KEY)' \
-                    'ASPNETCORE_ENVIRONMENT=Production'
+              inlineScript: | 
+                setlocal enabledelayedexpansion
+                set "CONN_STRING=$(NEON_CONNECTION_STRING)"
+                az containerapp update --name "$(CONTAINER_APP_NAME)" --resource-group "$(RESOURCE_GROUP)" --set-env-vars "ConnectionStrings__Postgresql=!CONN_STRING!" "Jwt__Key=$(JWT_KEY)" "ASPNETCORE_ENVIRONMENT=Production"
+              
           - task: AzureCLI@2
             displayName: '✅ Smoke test'
             inputs:
