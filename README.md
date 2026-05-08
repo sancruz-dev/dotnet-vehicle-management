@@ -1,191 +1,161 @@
 ﻿# dotnet-vehicle-management
 
-[![.NET](https://img.shields.io/badge/.NET-7.0-512BD4?style=flat&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Angular](https://img.shields.io/badge/Angular-21-DD0031?style=flat&logo=angular&logoColor=white)](https://angular.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?style=flat&logo=postgresql&logoColor=white)](https://neon.tech/)
 [![JWT](https://img.shields.io/badge/JWT-Auth-000000?style=flat&logo=jsonwebtokens&logoColor=white)](https://jwt.io/)
 [![Swagger](https://img.shields.io/badge/Swagger-UI-85EA2D?style=flat&logo=swagger&logoColor=black)](https://swagger.io/)
 [![Semgrep](https://img.shields.io/badge/Semgrep-Security-1B2D55?style=flat&logo=semgrep&logoColor=white)](https://semgrep.dev/)
+[![Azure DevOps](https://img.shields.io/badge/Azure_DevOps-CI%2FCD-0078D7?style=flat&logo=azuredevops&logoColor=white)](https://dev.azure.com/)
 [![MSTest](https://img.shields.io/badge/MSTest-Testing-68217A?style=flat&logo=microsoft&logoColor=white)](https://learn.microsoft.com/en-us/dotnet/core/testing/)
 
-Sistema completo de gerenciamento de veículos com API RESTful em .NET, frontend em Angular e pipeline de análise de segurança com Semgrep.
+Sistema de gerenciamento de veículos desenvolvido como **projeto de portfólio e aprendizado**, cobrindo de forma prática os principais pilares de desenvolvimento de software moderno: API RESTful em .NET 8, frontend em Angular, banco de dados relacional, análise de segurança estática e pipeline de CI/CD com deploy automatizado na nuvem.
 
----
+> **Nota sobre custos:** Por ser um projeto de estudo, as escolhas de infraestrutura foram feitas para manter o ecossistema funcional com o menor custo possível. O banco de dados utiliza o [Neon](https://neon.tech/) (PostgreSQL serverless com tier gratuito) e o pipeline de CI/CD utiliza um **agente local self-hosted** no Azure DevOps, evitando consumo de minutos de pipeline pagos. Os recursos Azure provisionados (Container Apps, Container Registry e Static Web Apps) foram escolhidos nos SKUs mais econômicos disponíveis.
 
-## Sumário
 
-- [Visão Geral](#visão-geral)
-- [Tecnologias](#tecnologias)
-- [Arquitetura](#arquitetura)
-- [Funcionalidades](#funcionalidades)
-- [Pré-requisitos](#pré-requisitos)
-- [Como Rodar](#como-rodar)
-- [Endpoints da API](#endpoints-da-api)
-- [Análise de Segurança](#análise-de-segurança)
-- [Testes](#testes)
+![Imagem da tela principal do APP](assets/app-main-screen.png)
 
 ---
 
 ## Visão Geral
 
-Aplicação full-stack para gerenciamento de veículos com autenticação JWT, controle de acesso baseado em perfis (Adm/Editor), CRUD completo e análise estática de vulnerabilidades integrada ao fluxo de desenvolvimento.
+A aplicação permite o gerenciamento de veículos com autenticação JWT, controle de acesso baseado em perfis (`Adm` / `Editor`) e CRUD completo. O objetivo principal é demonstrar, de forma integrada, as práticas necessárias na engenharia de software e computação em nuvem.
+
 
 ---
 
-## Tecnologias
+## Stack e Decisões Técnicas
 
-### Backend
-- **.NET 7** com ASP.NET Core Web API
-- **Entity Framework Core 7** — Code First com migrations
-- **PostgreSQL** — banco de dados relacional
-- **JWT (JSON Web Tokens)** — autenticação stateless
-- **BCrypt** — hash seguro de senhas
-- **Swagger / OpenAPI** — documentação interativa
+### Backend — .NET 8 / ASP.NET Core
+- Organizado seguindo princípios de **Clean Architecture** e **DDD**: separação clara entre `Domain`, `Infrastructure` e `Services`
+- **Repository Pattern** via interfaces (`IAdminService`, `IVeiculoService`), desacoplando domínio da infraestrutura e facilitando testes com mocks
+- **Dependency Injection** em toda a cadeia de dependências
+- **Entity Framework Core 8** com Code First Migrations e PostgreSQL (Npgsql)
+- **JWT stateless** com expiração configurável e autorização baseada em roles (`[Authorize(Roles = "Adm")]`)
+- **BCrypt** para hash seguro de senhas — nunca armazenadas em texto puro
+- **Middleware global de exceções** centralizado (`ExceptionMiddleware`), evitando try/catch espalhados pelos controllers
+- Documentação interativa via **Swagger/OpenAPI**, com suporte a autenticação Bearer direto na UI
 
-### Frontend
-- **Angular 21** — SPA com NgModule
-- **Bootstrap 5** + Bootstrap Icons — UI responsiva
-- **HttpClient** com interceptor JWT automático
-- **Route Guards** — proteção de rotas autenticadas
+### Frontend — Angular 21
+- SPA com módulos NgModule, roteamento protegido por **AuthGuard** e injeção automática de token via **HttpInterceptor**
+- Redirecionamento automático para login em caso de token expirado (tratamento de 401)
+- UI responsiva com **Bootstrap 5** e Bootstrap Icons
 
-### Qualidade e Segurança
-- **Semgrep** — análise estática de vulnerabilidades (regras customizadas + ruleset `p/csharp`)
-- **MSTest** — testes unitários e de integração
-- **Middleware global** de tratamento de exceções
+### Banco de Dados — PostgreSQL (Neon)
+- Modelagem relacional com duas entidades: `Admins` e `Veiculos`
+- Migrations gerenciadas pelo EF Core com seed de dados inicial
+- Senhas hasheadas já na migration, nunca em plaintext
+
+### Segurança — Semgrep
+- Análise estática de vulnerabilidades integrada ao pipeline com regras **customizadas** (`.semgrep.yml`) e o ruleset oficial `p/csharp`
+- **Quality Gate** configurado no pipeline: builds são bloqueados em caso de findings `HIGH` ou `CRITICAL`
+- Regras customizadas cobrem uso inseguro de `ExecuteSqlRaw` (potencial SQL Injection) e `Console.WriteLine` em produção (risco de vazamento de dados)
+
+### CI/CD — Azure DevOps + Docker
+
+O pipeline (`azure-pipelines.yml`) roda em um **agente local self-hosted**, eliminando o custo de minutos de pipeline pagos. O build da imagem Docker também acontece localmente, com push direto para o **Azure Container Registry**. O pipeline cobre 4 estágios:
+
+```
+Build & Security  →  Docker Build & Push  →  Deploy  →  Publish Artifacts
+```
+
+![alt text](assets/pipelines-az-devops.png)
+
+1. **Build & Security:** compila a API e o frontend Angular, roda os testes MSTest e executa a análise Semgrep com quality gate
+2. **Docker Build & Push:** constrói a imagem via Dockerfile multi-stage e faz push para o ACR
+3. **Deploy:**
+   - Backend → **Azure Container Apps**, atualizado via `az containerapp update` com a nova imagem
+   - Frontend → **Azure Static Web Apps**, publicado via SWA CLI
+4. **Publish Artifacts:** promove binários para artefatos de release
+
+Segredos como connection string, JWT Key e deployment token são gerenciados pelo **Azure DevOps Library** (Variable Group), nunca expostos no código.
+
+### Infraestrutura Azure
+
+![Imagem do Resource Visualizer do Azure](assets/resource-group-infra.png)
+
+
+| Recurso | Tipo | Finalidade |
+|---|---|---|
+| `vehicle-api` | Container App | Hospedagem da API .NET |
+| `acrvehicle****` | Container Registry | Armazenamento das imagens Docker |
+| `cae-vehicle` | Container Apps Environment | Infraestrutura compartilhada dos containers |
+| `swa-vehicle-frontend` | Static Web App | Hospedagem do frontend Angular |
+| `workspace-*` | Log Analytics Workspace | Monitoramento e logs |
+
+Toda a infraestrutura pode ser recriada com o script `setup-azure.sh`.
+
+### Testes — MSTest
+- **Testes unitários** de entidades (`AdminTest`)
+- **Testes de integração** de serviços contra banco real (`AdminServiceTest`)
+- **Testes de endpoints HTTP** com `WebApplicationFactory` e mocks de serviços (`AdminRequestTest`), cobrindo fluxos de login válido e inválido
 
 ---
 
-## Arquitetura
-
-O projeto segue os princípios de **Clean Architecture** e **Domain-Driven Design (DDD)**:
+## Estrutura do Projeto
 
 ```
 dotnet-vehicle-management/
-│
-├── API/                          # Backend principal
-│   ├── Domain/                   # Núcleo do domínio
-│   │   ├── Controllers/          # Endpoints da API
-│   │   ├── DTOs/                 # Objetos de transferência de dados
-│   │   ├── Entities/             # Entidades de negócio
-│   │   ├── Enums/                # Enumerações do domínio
-│   │   ├── Interfaces/           # Contratos de serviços
-│   │   ├── ModelViews/           # Modelos de resposta
-│   │   └── Services/             # Regras de negócio
-│   ├── infrastructure/           # Implementações concretas
-│   │   ├── Auth/                 # Configuração JWT
-│   │   ├── DB/                   # DbContext e migrations
-│   │   └── ExceptionMiddleware   # Tratamento global de erros
-│   ├── Migrations/               # Histórico de migrations EF Core
-│   ├── Startup.cs                # Configuração de serviços e middlewares
-│   └── Program.cs                # Entry point
-│
-├── frontend/                     # Frontend Angular
+├── API/
+│   ├── Domain/
+│   │   ├── Controllers/       # AdminsController, VeiculosController, HomeController
+│   │   ├── DTOs/              # Objetos de entrada (AdminDTO, LoginDTO, VeiculoDTO)
+│   │   ├── Entities/          # Entidades Admin e Veiculo
+│   │   ├── Interfaces/        # Contratos IAdminService, IVeiculoService
+│   │   ├── ModelViews/        # Objetos de resposta
+│   │   └── Services/          # Regras de negócio
+│   ├── infrastructure/
+│   │   ├── Auth/              # JwtSettings
+│   │   ├── DB/                # MinimalApiContext (DbContext + seed)
+│   │   └── ExceptionMiddleware.cs
+│   ├── Migrations/
+│   ├── Startup.cs             # Configuração de serviços e middlewares
+│   └── Program.cs
+├── frontend/
 │   └── src/app/
-│       ├── core/
-│       │   ├── guards/           # AuthGuard
-│       │   └── interceptors/     # Interceptor JWT
-│       ├── models/               # Interfaces TypeScript
-│       ├── pages/
-│       │   ├── login/            # Tela de login
-│       │   └── veiculos/         # CRUD de veículos
-│       └── services/             # AuthService, VeiculoService
-│
-├── Test/                         # Projeto de testes
-│   ├── Domain/                   # Testes de entidades e serviços
-│   ├── Helpers/                  # Setup de testes de integração
-│   ├── Mocks/                    # Mocks de serviços
-│   └── Requests/                 # Testes de endpoints HTTP
-│
-├── .semgrep.yml                  # Regras customizadas de segurança
-└── semgrep-scan.ps1              # Script de análise de vulnerabilidades
+│       ├── core/              # AuthGuard, AuthInterceptor
+│       ├── models/            # Interfaces TypeScript
+│       ├── pages/             # Login, Veiculos
+│       └── services/          # AuthService, VeiculoService
+├── Test/
+│   ├── Domain/                # Testes unitários e de integração
+│   ├── Helpers/               # WebApplicationFactory setup
+│   ├── Mocks/                 # AdminServiceMock
+│   └── Requests/              # Testes de endpoints HTTP
+├── Dockerfile                 # Multi-stage build (SDK → ASP.NET runtime)
+├── azure-pipelines.yml        # Pipeline CI/CD completo (4 estágios)
+├── setup-azure.sh             # Script de provisionamento da infraestrutura Azure
+└── .semgrep.yml               # Regras customizadas de análise de segurança
 ```
 
-### Decisões de Design
-
-- **Repository Pattern** via interfaces (`IAdminService`, `IVeiculoService`) desacoplando domínio da infraestrutura
-- **Dependency Injection** em toda a cadeia de serviços
-- **Role-based Authorization** com perfis `Adm` e `Editor`
-- **BCrypt** para hash de senhas, nunca armazenadas em texto puro
-- **Middleware de exceções** centralizado, evitando try/catch espalhados pelos controllers
-
 ---
 
-## Funcionalidades
+## Como Rodar Localmente
 
-### API
-- Autenticação com JWT e expiração configurável
-- CRUD completo de veículos com paginação
-- Gerenciamento de administradores (restrito ao perfil `Adm`)
-- Validação de dados em todas as entradas
-- Documentação Swagger disponível em `/swagger`
+### Pré-requisitos
+- .NET 8 SDK
+- Node.js 20+ e Angular CLI (`npm install -g @angular/cli`)
+- PostgreSQL 15+ (local ou conta [Neon](https://neon.tech/))
 
-### Frontend
-- Login com feedback de erro e loading state
-- Listagem de veículos em tempo real
-- Cadastro e edição inline via formulário
-- Exclusão com confirmação (restrita ao perfil `Adm`)
-- Logout com limpeza de sessão
-- Redirecionamento automático para login em caso de token expirado
-
----
-
-## Pré-requisitos
-
-- [.NET 7 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/7.0)
-- [Node.js 18+](https://nodejs.org/)
-- [Angular CLI](https://angular.io/cli) (`npm install -g @angular/cli`)
-- [PostgreSQL 15+](https://www.postgresql.org/download/)
-- [Python 3.8+](https://www.python.org/) (para o Semgrep)
-
----
-
-## Como Rodar
-
-### 1. Clone o repositório
+### Backend
 
 ```bash
-git clone https://github.com/seu-usuario/dotnet-vehicle-management.git
-cd dotnet-vehicle-management
-```
-
-### 2. Configure o banco de dados
-
-No PostgreSQL, crie o banco:
-
-```sql
-CREATE DATABASE db_minimal_api;
-```
-
-### 3. Configure a connection string
-
-Em `API/appsettings.json`, ajuste:
-
-```json
-"ConnectionStrings": {
-  "Postgresql": "Host=localhost;Port=5432;Database=db_minimal_api;Username=postgres;Password=SUA_SENHA"
-}
-```
-
-### 4. Aplique as migrations e rode a API
-
-```bash
+# Configure a connection string em API/appsettings.json
 cd API
 dotnet ef database update
 dotnet run
+# Swagger: http://localhost:5097/swagger
 ```
 
-A API estará disponível em `http://localhost:5097`.  
-Swagger em `http://localhost:5097/swagger`.
-
-### 5. Rode o frontend
+### Frontend
 
 ```bash
 cd frontend
 npm install
 ng serve
+# Acesse: http://localhost:4200
 ```
-
-Acesse `http://localhost:4200`.
 
 ### Credenciais padrão
 
@@ -196,63 +166,40 @@ Acesse `http://localhost:4200`.
 
 ---
 
-## Endpoints da API
-
-### Autenticação
+## Endpoints e Schemas da API
 
 | Método | Rota | Descrição | Auth |
 |---|---|---|---|
-| POST | `/Admins/login` | Autenticação e geração de token JWT | Público |
-
-### Veículos
-
-| Método | Rota | Descrição | Auth |
-|---|---|---|---|
-| GET | `/Veiculos/veiculos` | Lista veículos (paginado) | JWT |
-| GET | `/Veiculos/veiculo/{id}` | Busca veículo por ID | JWT |
-| POST | `/Veiculos/veiculo` | Cadastra novo veículo | JWT |
-| PUT | `/Veiculos/veiculo/{id}` | Atualiza veículo | Adm |
-| DELETE | `/Veiculos/veiculo/{id}` | Remove veículo | Adm |
-
-### Administradores
-
-| Método | Rota | Descrição | Auth |
-|---|---|---|---|
+| POST | `/Admins/login` | Login e geração de token JWT | Público |
 | GET | `/Admins/admins` | Lista administradores | Adm |
 | GET | `/Admins/admins/{id}` | Busca administrador por ID | Adm |
 | POST | `/Admins/admin` | Cadastra administrador | Adm |
+| GET | `/Veiculos/veiculos` | Lista veículos (paginado) | JWT |
+| GET | `/Veiculos/veiculo/{id}` | Busca veículo por ID | JWT |
+| POST | `/Veiculos/veiculo` | Cadastra veículo | JWT |
+| PUT | `/Veiculos/veiculo/{id}` | Atualiza veículo | Adm |
+| DELETE | `/Veiculos/veiculo/{id}` | Remove veículo | Adm |
+
+<img style="max-width: 600px" src="assets/swagger-endpoints.png" alt="Imagem dos endpoints no Swagger UI">
+<img src="assets/swagger-schemas.png" alt="Imagem dos schemas no Swagger UI">
+
+
 
 ---
 
 ## Análise de Segurança
 
-O projeto utiliza **Semgrep** para análise estática de vulnerabilidades, com regras customizadas e o ruleset oficial `p/csharp`.
-
-### Instalar o Semgrep
-
 ```bash
 pip install semgrep
-```
 
-### Rodar a análise
+# Linux/Mac
+./semgrep-scan.sh
 
-```powershell
+# Windows
 .\semgrep-scan.ps1
 ```
 
-Dois relatórios JSON são gerados:
-
-| Arquivo | Conteúdo |
-|---|---|
-| `semgrep-custom-report.json` | Resultado das regras customizadas do projeto |
-| `semgrep-full-report.json` | Resultado do ruleset oficial `p/csharp` (27 regras) |
-
-### Regras customizadas
-
-| ID | Severidade | Descrição |
-|---|---|---|
-| `sql-injection-executesqlraw` | WARNING | Detecta uso de `ExecuteSqlRaw` sem parâmetros |
-| `console-writeline-sensitive` | INFO | Detecta `Console.WriteLine` que pode expor dados em produção |
+Dois relatórios JSON são gerados: `semgrep-custom-report.json` (regras do projeto) e `semgrep-full-report.json` (ruleset oficial `p/csharp`).
 
 ---
 
@@ -262,5 +209,3 @@ Dois relatórios JSON são gerados:
 cd Test
 dotnet test
 ```
-
-O projeto de testes cobre entidades, serviços e endpoints HTTP com mocks, utilizando **MSTest** e `WebApplicationFactory` para testes de integração.
