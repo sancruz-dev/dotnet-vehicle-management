@@ -249,8 +249,12 @@ stages:
               scriptLocation: inlineScript
               inlineScript: |
                 az extension add --name staticwebapp --yes
-                az staticwebapp deploy --name "$(SWA_NAME)" --resource-group "$(RESOURCE_GROUP)" --source "$(Pipeline.Workspace)/frontend-dist/frontend/browser" --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" --no-build
-                
+                az staticwebapp deploy ^
+                  --name "$(SWA_NAME)" ^
+                  --resource-group "$(RESOURCE_GROUP)" ^
+                  --source "$(Pipeline.Workspace)/frontend-dist/frontend/browser" ^
+                  --deployment-token "$(SWA_DEPLOYMENT_TOKEN)" ^
+                  --no-build
   # ═══════════════════════════════════════════════════════════════
   # STAGE 4 — PUBLISH ARTIFACTS (somente main, após deploy OK)
   # ═══════════════════════════════════════════════════════════════
